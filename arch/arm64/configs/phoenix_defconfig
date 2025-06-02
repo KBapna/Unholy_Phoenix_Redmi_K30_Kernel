@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-CONFIG_LOCALVERSION="-Unholy-0.1"
+CONFIG_LOCALVERSION="-Unholy_V1.0"
 
 # Device
 CONFIG_MACH_XIAOMI_PHOENIX=y
