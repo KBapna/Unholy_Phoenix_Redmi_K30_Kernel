@@ -1,5 +1,6 @@
 package com.rifsxd.ksunext.ui.viewmodel
 
+import android.net.Uri
 import android.os.SystemClock
 import android.util.Log
 import androidx.compose.runtime.derivedStateOf
@@ -8,16 +9,19 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import java.text.Collator
-import java.util.Locale
 import com.rifsxd.ksunext.ksuApp
 import com.rifsxd.ksunext.ui.util.HanziToPinyin
+import com.rifsxd.ksunext.ui.util.getModuleSize
 import com.rifsxd.ksunext.ui.util.listModules
-import com.rifsxd.ksunext.ui.util.overlayFsAvailable
+import com.rifsxd.ksunext.ui.util.zygiskRequired
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.File
+import java.text.Collator
+import java.util.*
 
 class ModuleViewModel : ViewModel() {
 
@@ -39,7 +43,10 @@ class ModuleViewModel : ViewModel() {
         val updateJson: String,
         val hasWebUi: Boolean,
         val hasActionScript: Boolean,
-        val dirId: String
+        val dirId: String,
+        val size: Long,
+        val banner: String,
+        val zygiskRequired: Boolean
     )
 
     data class ModuleUpdateInfo(
@@ -49,9 +56,6 @@ class ModuleViewModel : ViewModel() {
         val changelog: String,
     )
 
-    var isOverlayAvailable by mutableStateOf(overlayFsAvailable())
-        private set
-
     var isRefreshing by mutableStateOf(false)
         private set
 
@@ -59,11 +63,21 @@ class ModuleViewModel : ViewModel() {
 
     var sortAToZ by mutableStateOf(false)
     var sortZToA by mutableStateOf(false)
+    var sortSizeLowToHigh by mutableStateOf(false)
+    var sortSizeHighToLow by mutableStateOf(false)
+    var sortEnabledFirst by mutableStateOf(false)
+    var sortActionFirst by mutableStateOf(false)
+    var sortWebUiFirst by mutableStateOf(false)
 
     val moduleList by derivedStateOf {
         val comparator = when {
-            sortAToZ -> compareBy<ModuleInfo> { it.name.lowercase() }
-            sortZToA -> compareByDescending<ModuleInfo> { it.name.lowercase() }
+            sortWebUiFirst -> compareByDescending { it.hasWebUi }
+            sortEnabledFirst -> compareByDescending { it.enabled }
+            sortActionFirst -> compareByDescending { it.hasActionScript }
+            sortAToZ -> compareBy { it.name.lowercase() }
+            sortZToA -> compareByDescending { it.name.lowercase() }
+            sortSizeLowToHigh -> compareBy { it.size }
+            sortSizeHighToLow -> compareByDescending { it.size }
             else -> compareBy<ModuleInfo> { it.dirId }
         }.thenBy(Collator.getInstance(Locale.getDefault()), ModuleInfo::id)
 
@@ -84,55 +98,74 @@ class ModuleViewModel : ViewModel() {
         isNeedRefresh = true
     }
 
+    var zipUris by mutableStateOf<List<Uri>>(emptyList())
+
+    fun updateZipUris(uris: List<Uri>) {
+        zipUris = uris
+    }
+
+    fun clearZipUris() {
+        zipUris = emptyList()
+    }
+
     fun fetchModuleList() {
-        viewModelScope.launch(Dispatchers.IO) {
+        
+        viewModelScope.launch {
+
             isRefreshing = true
 
-            val oldModuleList = modules
+            withContext(Dispatchers.IO) {
+                val start = SystemClock.elapsedRealtime()
+                val oldModuleList = modules
 
-            val start = SystemClock.elapsedRealtime()
+                kotlin.runCatching {
+                    val result = listModules()
+                    Log.i(TAG, "result: $result")
 
-            kotlin.runCatching {
-                isOverlayAvailable = overlayFsAvailable()
+                    val array = JSONArray(result)
+                    modules = (0 until array.length())
+                        .asSequence()
+                        .map { array.getJSONObject(it) }
+                        .map { obj ->
+                            val id = obj.getString("id")
+                            val dirId = obj.getString("dir_id")
+                            val moduleDir = File("/data/adb/modules/$dirId")
+                            val size = getModuleSize(moduleDir)
+                            val zygiskRequired = zygiskRequired(moduleDir)
 
-                val result = listModules()
+                            ModuleInfo(
+                                id,
+                                obj.optString("name"),
+                                obj.optString("author", "Unknown"),
+                                obj.optString("version", "Unknown"),
+                                obj.optInt("versionCode", 0),
+                                obj.optString("description"),
+                                obj.getBoolean("enabled"),
+                                obj.getBoolean("update"),
+                                obj.getBoolean("remove"),
+                                obj.optString("updateJson"),
+                                obj.optBoolean("web"),
+                                obj.optBoolean("action"),
+                                dirId,
+                                size,
+                                obj.optString("banner"),
+                                zygiskRequired
+                            )
+                        }.toList()
+                    isNeedRefresh = false
+                }.onFailure { e ->
+                    Log.e(TAG, "fetchModuleList: ", e)
+                    isRefreshing = false
+                }
 
-                Log.i(TAG, "result: $result")
+                // when both old and new is kotlin.collections.EmptyList
+                // moduleList update will don't trigger
+                if (oldModuleList === modules) {
+                    isRefreshing = false
+                }
 
-                val array = JSONArray(result)
-                modules = (0 until array.length())
-                    .asSequence()
-                    .map { array.getJSONObject(it) }
-                    .map { obj ->
-                        ModuleInfo(
-                            obj.getString("id"),
-                            obj.optString("name"),
-                            obj.optString("author", "Unknown"),
-                            obj.optString("version", "Unknown"),
-                            obj.optInt("versionCode", 0),
-                            obj.optString("description"),
-                            obj.getBoolean("enabled"),
-                            obj.getBoolean("update"),
-                            obj.getBoolean("remove"),
-                            obj.optString("updateJson"),
-                            obj.optBoolean("web"),
-                            obj.optBoolean("action"),
-                            obj.getString("dir_id")
-                        )
-                    }.toList()
-                isNeedRefresh = false
-            }.onFailure { e ->
-                Log.e(TAG, "fetchModuleList: ", e)
-                isRefreshing = false
+                Log.i(TAG, "load cost: ${SystemClock.elapsedRealtime() - start}, modules: $modules")
             }
-
-            // when both old and new is kotlin.collections.EmptyList
-            // moduleList update will don't trigger
-            if (oldModuleList === modules) {
-                isRefreshing = false
-            }
-
-            Log.i(TAG, "load cost: ${SystemClock.elapsedRealtime() - start}, modules: $modules")
         }
     }
 

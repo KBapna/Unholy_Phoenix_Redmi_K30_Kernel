@@ -1,66 +1,43 @@
 package com.rifsxd.ksunext.ui.screen
 
 import android.widget.Toast
+import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.WindowInsetsSides
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.only
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ImportExport
 import androidx.compose.material.icons.filled.Sync
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExtendedFloatingActionButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.TopAppBarScrollBehavior
+import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import androidx.compose.material3.rememberTopAppBarState
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.dropUnlessResumed
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.dergoogler.mmrl.ui.component.LabelItem
 import com.ramcosta.composedestinations.annotation.Destination
 import com.ramcosta.composedestinations.annotation.RootGraph
 import com.ramcosta.composedestinations.generated.destinations.TemplateEditorScreenDestination
 import com.ramcosta.composedestinations.navigation.DestinationsNavigator
 import com.ramcosta.composedestinations.result.ResultRecipient
 import com.ramcosta.composedestinations.result.getOr
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import com.rifsxd.ksunext.R
 import com.rifsxd.ksunext.ui.viewmodel.TemplateViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 /**
  * @author weishu
@@ -89,6 +66,30 @@ fun AppProfileTemplateScreen(
         if (result.getOr { false }) {
             scope.launch { viewModel.fetchTemplates() }
         }
+    }
+
+    val listState = rememberLazyListState()
+    var showFab by remember { mutableStateOf(true) }
+
+    LaunchedEffect(listState) {
+        var lastIndex = listState.firstVisibleItemIndex
+        var lastOffset = listState.firstVisibleItemScrollOffset
+
+        snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
+            .collect { (currIndex, currOffset) ->
+                val isScrollingDown = currIndex > lastIndex ||
+                        (currIndex == lastIndex && currOffset > lastOffset + 4)
+                val isScrollingUp = currIndex < lastIndex ||
+                        (currIndex == lastIndex && currOffset < lastOffset - 4)
+
+                when {
+                    isScrollingDown && showFab -> showFab = false
+                    isScrollingUp && !showFab -> showFab = true
+                }
+
+                lastIndex = currIndex
+                lastOffset = currOffset
+            }
     }
 
     Scaffold(
@@ -137,18 +138,30 @@ fun AppProfileTemplateScreen(
             )
         },
         floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = {
-                    navigator.navigate(
-                        TemplateEditorScreenDestination(
-                            TemplateViewModel.TemplateInfo(),
-                            false
+            AnimatedVisibility(
+                visible = showFab,
+                enter = scaleIn(
+                    animationSpec = tween(200),
+                    initialScale = 0.8f
+                ) + fadeIn(animationSpec = tween(400)),
+                exit = scaleOut(
+                    animationSpec = tween(200),
+                    targetScale = 0.8f
+                ) + fadeOut(animationSpec = tween(400))
+            ) {
+                ExtendedFloatingActionButton(
+                    onClick = {
+                        navigator.navigate(
+                            TemplateEditorScreenDestination(
+                                TemplateViewModel.TemplateInfo(),
+                                false
+                            )
                         )
-                    )
-                },
-                icon = { Icon(Icons.Filled.Add, null) },
-                text = { Text(stringResource(id = R.string.app_profile_template_create)) },
-            )
+                    },
+                    icon = { Icon(Icons.Filled.Add, null) },
+                    text = { Text(stringResource(id = R.string.app_profile_template_create)) },
+                )
+            }
         },
         contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal)
     ) { innerPadding ->
@@ -160,11 +173,12 @@ fun AppProfileTemplateScreen(
             }
         ) {
             LazyColumn(
+                state = listState,
                 modifier = Modifier
                     .fillMaxSize()
                     .nestedScroll(scrollBehavior.nestedScrollConnection),
                 contentPadding = remember {
-                    PaddingValues(bottom = 16.dp + 56.dp + 16.dp /* Scaffold Fab Spacing + Fab container height */)
+                    PaddingValues(bottom = 16.dp /* Scaffold Fab Spacing + Fab container height */)
                 }
             ) {
                 items(viewModel.templateList, key = { it.id }) { app ->
@@ -186,7 +200,11 @@ private fun TemplateItem(
             .clickable {
                 navigator.navigate(TemplateEditorScreenDestination(template, !template.local))
             },
-        headlineContent = { Text(template.name) },
+        headlineContent = { Text(
+            text = template.name,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+        ) },
         supportingContent = {
             Column {
                 Text(
@@ -195,14 +213,19 @@ private fun TemplateItem(
                     fontSize = MaterialTheme.typography.bodySmall.fontSize,
                 )
                 Text(template.description)
-                FlowRow {
-                    LabelText(label = "UID: ${template.uid}")
-                    LabelText(label = "GID: ${template.gid}")
-                    LabelText(label = template.context)
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    LabelItem(text = "UID: ${template.uid}")
+                    LabelItem(text = "GID: ${template.gid}")
+                    LabelItem(text = template.context)
                     if (template.local) {
-                        LabelText(label = "local")
+                        LabelItem(text = "local")
                     } else {
-                        LabelText(label = "remote")
+                        LabelItem(text = "remote")
                     }
                 }
             }
@@ -221,7 +244,11 @@ private fun TopBar(
 ) {
     TopAppBar(
         title = {
-            Text(stringResource(R.string.settings_profile_template))
+            Text(
+                text = stringResource(R.string.settings_profile_template),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Black,
+            )
         },
         navigationIcon = {
             IconButton(

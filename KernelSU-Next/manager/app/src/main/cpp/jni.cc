@@ -8,7 +8,11 @@
 #include "ksu.h"
 
 #define LOG_TAG "KernelSU-Next"
+#ifdef NDEBUG
+#define LOGD(...) (void)0
+#else
 #define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
+#endif
 
 extern "C"
 JNIEXPORT jboolean JNICALL
@@ -23,6 +27,13 @@ extern "C"
 JNIEXPORT jint JNICALL
 Java_com_rifsxd_ksunext_Natives_getVersion(JNIEnv *env, jobject) {
     return get_version();
+}
+
+extern "C"
+JNIEXPORT jint JNICALL
+Java_com_rifsxd_ksunext_Natives_getManagerUid(JNIEnv *env, jobject) {
+    uid_t manager_uid = get_manager_uid();
+    return (jint)manager_uid;
 }
 
 extern "C"
@@ -312,4 +323,10 @@ extern "C"
 JNIEXPORT jboolean JNICALL
 Java_com_rifsxd_ksunext_Natives_setSuEnabled(JNIEnv *env, jobject thiz, jboolean enabled) {
     return set_su_enabled(enabled);
+}
+
+extern "C"
+JNIEXPORT jboolean JNICALL
+Java_com_rifsxd_ksunext_Natives_isZygiskEnabled(JNIEnv *env, jobject) {
+    return is_zygisk_enabled();
 }

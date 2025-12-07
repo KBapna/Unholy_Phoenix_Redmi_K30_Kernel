@@ -7,53 +7,28 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.WindowInsetsSides
-import androidx.compose.foundation.layout.only
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.Text
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.TopAppBarScrollBehavior
-import androidx.compose.material3.rememberTopAppBarState
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
-import com.dergoogler.mmrl.platform.Platform
+import androidx.core.content.edit
 import com.maxkeppeker.sheets.core.models.base.Header
 import com.maxkeppeker.sheets.core.models.base.IconSource
 import com.maxkeppeker.sheets.core.models.base.rememberUseCaseState
@@ -62,28 +37,18 @@ import com.maxkeppeler.sheets.list.models.ListOption
 import com.maxkeppeler.sheets.list.models.ListSelection
 import com.ramcosta.composedestinations.annotation.Destination
 import com.ramcosta.composedestinations.annotation.RootGraph
-import com.ramcosta.composedestinations.generated.destinations.AppProfileTemplateScreenDestination
-import com.ramcosta.composedestinations.generated.destinations.FlashScreenDestination
-import com.ramcosta.composedestinations.generated.destinations.BackupRestoreScreenDestination
+import com.ramcosta.composedestinations.generated.destinations.*
 import com.ramcosta.composedestinations.navigation.DestinationsNavigator
 import com.ramcosta.composedestinations.navigation.EmptyDestinationsNavigator
+import com.rifsxd.ksunext.BuildConfig
+import com.rifsxd.ksunext.Natives
+import com.rifsxd.ksunext.R
+import com.rifsxd.ksunext.ksuApp
+import com.rifsxd.ksunext.ui.component.*
+import com.rifsxd.ksunext.ui.util.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import com.rifsxd.ksunext.BuildConfig
-import com.rifsxd.ksunext.Natives
-import com.rifsxd.ksunext.ksuApp
-import com.rifsxd.ksunext.R
-import com.rifsxd.ksunext.ui.component.AboutDialog
-import com.rifsxd.ksunext.ui.component.ConfirmResult
-import com.rifsxd.ksunext.ui.component.DialogHandle
-import com.rifsxd.ksunext.ui.component.SwitchItem
-import com.rifsxd.ksunext.ui.component.rememberConfirmDialog
-import com.rifsxd.ksunext.ui.component.rememberCustomDialog
-import com.rifsxd.ksunext.ui.component.rememberLoadingDialog
-import com.rifsxd.ksunext.ui.util.LocalSnackbarHost
-import com.rifsxd.ksunext.ui.util.getBugreportFile
-import com.rifsxd.ksunext.ui.util.*
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
@@ -97,6 +62,8 @@ import java.time.format.DateTimeFormatter
 fun SettingScreen(navigator: DestinationsNavigator) {
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
     val snackBarHost = LocalSnackbarHost.current
+    var isGlobalNamespaceEnabled by rememberSaveable { mutableStateOf(false) }
+    isGlobalNamespaceEnabled = isGlobalNamespaceEnabled()
 
     val isManager = Natives.becomeManager(ksuApp.packageName)
     val ksuVersion = if (isManager) Natives.version else null
@@ -146,7 +113,11 @@ fun SettingScreen(navigator: DestinationsNavigator) {
             if (ksuVersion != null) {
                 ListItem(
                     leadingContent = { Icon(Icons.Filled.Fence, profileTemplate) },
-                    headlineContent = { Text(profileTemplate) },
+                    headlineContent = { Text(
+                        text = profileTemplate,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    ) },
                     supportingContent = { Text(stringResource(id = R.string.settings_profile_template_summary)) },
                     modifier = Modifier.clickable {
                         navigator.navigate(AppProfileTemplateScreenDestination)
@@ -188,14 +159,31 @@ fun SettingScreen(navigator: DestinationsNavigator) {
                         }
                     }
                 }
+                
+                SwitchItem(
+                    icon = Icons.Filled.Engineering,
+                    title = stringResource(id = R.string.settings_global_namespace_mode),
+                    summary = stringResource(id = R.string.settings_global_namespace_mode_summary),
+                    checked = isGlobalNamespaceEnabled,
+                    onCheckedChange = {
+                        setGlobalNamespaceEnabled(
+                            if (isGlobalNamespaceEnabled) {
+                                "0"
+                            } else {
+                                "1"
+                            }
+                        )
+                        isGlobalNamespaceEnabled = it
+                    }
+                )
             }
 
             val prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
 
             val suSFS = getSuSFS()
-            val isSUS_SU = getSuSFSFeatures()
+            val isSUS_SU = hasSuSFs_SUS_SU() == "Supported"
             if (suSFS == "Supported") {
-                if (isSUS_SU == "CONFIG_KSU_SUSFS_SUS_SU") {
+                if (isSUS_SU) {
                     var isEnabled by rememberSaveable {
                         mutableStateOf(susfsSUS_SU_Mode() == "2")
                     }
@@ -215,16 +203,18 @@ fun SettingScreen(navigator: DestinationsNavigator) {
                         } else {
                             susfsSUS_SU_0()
                         }
-                        prefs.edit().putBoolean("enable_sus_su", it).apply()
+                        prefs.edit { putBoolean("enable_sus_su", it) }
                         isEnabled = it
                     }
                 }
             }
 
             var useOverlayFs by rememberSaveable {
-                mutableStateOf(
-                    prefs.getBoolean("use_overlay_fs", false)
-                )
+                mutableStateOf(readMountSystemFile())
+            }
+
+            LaunchedEffect(Unit) {
+                useOverlayFs = readMountSystemFile()
             }
 
             var showRebootDialog by remember { mutableStateOf(false) }
@@ -238,12 +228,14 @@ fun SettingScreen(navigator: DestinationsNavigator) {
                     summary = stringResource(id = R.string.use_overlay_fs_summary),
                     checked = useOverlayFs
                 ) {
-                    prefs.edit().putBoolean("use_overlay_fs", it).apply()
+                    prefs.edit { putBoolean("use_overlay_fs", it) }
                     useOverlayFs = it
                     if (useOverlayFs) {
                         moduleBackup()
+                        updateMountSystemFile(true)
                     } else {
                         moduleMigration()
+                        updateMountSystemFile(false)
                     }
                     if (isManager) install()
                     showRebootDialog = true
@@ -253,7 +245,11 @@ fun SettingScreen(navigator: DestinationsNavigator) {
             if (showRebootDialog) {
                 AlertDialog(
                     onDismissRequest = { showRebootDialog = false },
-                    title = { Text(stringResource(R.string.reboot_required)) },
+                    title = { Text(
+                        text = stringResource(R.string.reboot_required),
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold
+                    ) },
                     text = { Text(stringResource(R.string.reboot_message)) },
                     confirmButton = {
                         TextButton(onClick = {
@@ -283,80 +279,8 @@ fun SettingScreen(navigator: DestinationsNavigator) {
                 summary = stringResource(id = R.string.settings_check_update_summary),
                 checked = checkUpdate
             ) {
-                prefs.edit().putBoolean("check_update", it).apply()
+                prefs.edit { putBoolean("check_update", it) }
                 checkUpdate = it
-            }
-
-            var enableWebDebugging by rememberSaveable {
-                mutableStateOf(
-                    prefs.getBoolean("enable_web_debugging", false)
-                )
-            }
-
-            if (ksuVersion != null) {
-                SwitchItem(
-                    icon = Icons.Filled.Web,
-                    title = stringResource(id = R.string.enable_web_debugging),
-                    summary = stringResource(id = R.string.enable_web_debugging_summary),
-                    checked = enableWebDebugging
-                ) {
-                    prefs.edit().putBoolean("enable_web_debugging", it).apply()
-                    enableWebDebugging = it
-                }
-            }
-
-            var developerOptionsEnabled by rememberSaveable {
-                mutableStateOf(
-                    prefs.getBoolean("enable_developer_options", false)
-                )
-            }
-            if (ksuVersion != null) {
-                SwitchItem(
-                    icon = Icons.Filled.DeveloperMode,
-                    title = stringResource(id = R.string.enable_developer_options),
-                    summary = stringResource(id = R.string.enable_developer_options_summary),
-                    checked = developerOptionsEnabled
-                ) {
-                    prefs.edit().putBoolean("enable_developer_options", it).apply()
-                    developerOptionsEnabled = it
-                }
-            }
-
-            var useWebUIX by rememberSaveable {
-                mutableStateOf(
-                    prefs.getBoolean("use_webuix", true)
-                )
-            }
-            if (ksuVersion != null) {
-                SwitchItem(
-                    beta = false,
-                    enabled = Platform.isAlive,
-                    icon = Icons.Filled.WebAsset,
-                    title = stringResource(id = R.string.use_webuix),
-                    summary = stringResource(id = R.string.use_webuix_summary),
-                    checked = useWebUIX
-                ) {
-                    prefs.edit().putBoolean("use_webuix", it).apply()
-                    useWebUIX = it
-                }
-            }
-            var useWebUIXEruda by rememberSaveable {
-                mutableStateOf(
-                    prefs.getBoolean("use_webuix_eruda", false)
-                )
-            }
-            if (ksuVersion != null) {
-                SwitchItem(
-                    beta = false,
-                    enabled = Platform.isAlive && useWebUIX && enableWebDebugging,
-                    icon = Icons.Filled.FormatListNumbered,
-                    title = stringResource(id = R.string.use_webuix_eruda),
-                    summary = stringResource(id = R.string.use_webuix_eruda_summary),
-                    checked = useWebUIXEruda
-                ) {
-                    prefs.edit().putBoolean("use_webuix_eruda", it).apply()
-                    useWebUIXEruda = it
-                }
             }
 
             if (isOverlayAvailable && useOverlayFs) {
@@ -369,7 +293,11 @@ fun SettingScreen(navigator: DestinationsNavigator) {
                             shrink
                         )
                     },
-                    headlineContent = { Text(shrink) },
+                    headlineContent = { Text(
+                        text = shrink,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    ) },
                     modifier = Modifier.clickable {
                         scope.launch {
                             val result = shrinkDialog.awaitConfirm(title = shrink, content = shrinkMessage)
@@ -383,6 +311,24 @@ fun SettingScreen(navigator: DestinationsNavigator) {
                 )
             }
 
+            val customization = stringResource(id = R.string.customization)
+            ListItem(
+                leadingContent = {
+                    Icon(
+                        Icons.Filled.Palette,
+                        customization
+                    )
+                },
+                headlineContent = { Text(
+                    text = customization,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                ) },
+                modifier = Modifier.clickable {
+                    navigator.navigate(CustomizationScreenDestination)
+                }
+            )
+
             if (ksuVersion != null) {
                 val backupRestore = stringResource(id = R.string.backup_restore)
                 ListItem(
@@ -392,19 +338,43 @@ fun SettingScreen(navigator: DestinationsNavigator) {
                             backupRestore
                         )
                     },
-                    headlineContent = { Text(backupRestore) },
+                    headlineContent = { Text(
+                        text = backupRestore,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    ) },
                     modifier = Modifier.clickable {
                         navigator.navigate(BackupRestoreScreenDestination)
                     }
                 )
             }
 
-            // val lkmMode = Natives.version >= Natives.MINIMAL_SUPPORTED_KERNEL_LKM && Natives.isLkmMode
-            // if (lkmMode) {
-            //     UninstallItem(navigator) {
-            //         loadingDialog.withLoading(it)
-            //     }
-            // } // DISBAND LKM MODE
+            val developer = stringResource(id = R.string.developer)
+            if (ksuVersion != null) {
+                ListItem(
+                    leadingContent = {
+                        Icon(
+                            Icons.Filled.DeveloperBoard,
+                            developer
+                        )
+                    },
+                    headlineContent = { Text(
+                        text = developer,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    ) },
+                    modifier = Modifier.clickable {
+                        navigator.navigate(DeveloperScreenDestination)
+                    }
+                )
+            }
+
+            val lkmMode = Natives.version >= Natives.MINIMAL_SUPPORTED_KERNEL_LKM && Natives.isLkmMode
+            if (lkmMode) {
+                UninstallItem(navigator) {
+                    loadingDialog.withLoading(it)
+                }
+            }
 
             var showBottomsheet by remember { mutableStateOf(false) }
 
@@ -415,7 +385,11 @@ fun SettingScreen(navigator: DestinationsNavigator) {
                         stringResource(id = R.string.export_log)
                     )
                 },
-                headlineContent = { Text(stringResource(id = R.string.export_log)) },
+                headlineContent = { Text(
+                    text = stringResource(id = R.string.export_log),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                ) },
                 modifier = Modifier.clickable {
                     showBottomsheet = true
                 }
@@ -523,7 +497,11 @@ fun SettingScreen(navigator: DestinationsNavigator) {
                         about
                     )
                 },
-                headlineContent = { Text(about) },
+                headlineContent = { Text(
+                    text = about,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                ) },
                 modifier = Modifier.clickable {
                     aboutDialog.show()
                 }
@@ -532,107 +510,111 @@ fun SettingScreen(navigator: DestinationsNavigator) {
     }
 }
 
-// @Composable
-// fun UninstallItem(
-//     navigator: DestinationsNavigator,
-//     withLoading: suspend (suspend () -> Unit) -> Unit,
-// ) {
-//     val context = LocalContext.current
-//     val scope = rememberCoroutineScope()
-//     val uninstallConfirmDialog = rememberConfirmDialog()
-//     val showTodo = {
-//         Toast.makeText(context, "TODO", Toast.LENGTH_SHORT).show()
-//     }
-//     val uninstallDialog = rememberUninstallDialog { uninstallType ->
-//         scope.launch {
-//             val result = uninstallConfirmDialog.awaitConfirm(
-//                 title = context.getString(uninstallType.title),
-//                 content = context.getString(uninstallType.message)
-//             )
-//             if (result == ConfirmResult.Confirmed) {
-//                 withLoading {
-//                     when (uninstallType) {
-//                         UninstallType.TEMPORARY -> showTodo()
-//                         UninstallType.PERMANENT -> navigator.navigate(
-//                             FlashScreenDestination(FlashIt.FlashUninstall)
-//                         )
-//                         UninstallType.RESTORE_STOCK_IMAGE -> navigator.navigate(
-//                             FlashScreenDestination(FlashIt.FlashRestore)
-//                         )
-//                         UninstallType.NONE -> Unit
-//                     }
-//                 }
-//             }
-//         }
-//     }
-//     val uninstall = stringResource(id = R.string.settings_uninstall)
-//     ListItem(
-//         leadingContent = {
-//             Icon(
-//                 Icons.Filled.Delete,
-//                 uninstall
-//             )
-//         },
-//         headlineContent = { Text(uninstall) },
-//         modifier = Modifier.clickable {
-//             uninstallDialog.show()
-//         }
-//     )
-// }
+@Composable
+fun UninstallItem(
+    navigator: DestinationsNavigator,
+    withLoading: suspend (suspend () -> Unit) -> Unit,
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val uninstallConfirmDialog = rememberConfirmDialog()
+    val showTodo = {
+        Toast.makeText(context, "TODO", Toast.LENGTH_SHORT).show()
+    }
+    val uninstallDialog = rememberUninstallDialog { uninstallType ->
+        scope.launch {
+            val result = uninstallConfirmDialog.awaitConfirm(
+                title = context.getString(uninstallType.title),
+                content = context.getString(uninstallType.message)
+            )
+            if (result == ConfirmResult.Confirmed) {
+                withLoading {
+                    when (uninstallType) {
+                        UninstallType.TEMPORARY -> showTodo()
+                        UninstallType.PERMANENT -> navigator.navigate(
+                            FlashScreenDestination(FlashIt.FlashUninstall)
+                        )
+                        UninstallType.RESTORE_STOCK_IMAGE -> navigator.navigate(
+                            FlashScreenDestination(FlashIt.FlashRestore)
+                        )
+                        UninstallType.NONE -> Unit
+                    }
+                }
+            }
+        }
+    }
+    val uninstall = stringResource(id = R.string.settings_uninstall)
+    ListItem(
+        leadingContent = {
+            Icon(
+                Icons.Filled.Delete,
+                uninstall
+            )
+        },
+        headlineContent = { Text(
+            text = uninstall,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold
+        ) },
+        modifier = Modifier.clickable {
+            uninstallDialog.show()
+        }
+    )
+}
 
-// enum class UninstallType(val title: Int, val message: Int, val icon: ImageVector) {
-//     TEMPORARY(
-//         R.string.settings_uninstall_temporary,
-//         R.string.settings_uninstall_temporary_message,
-//         Icons.Filled.Delete
-//     ),
-//     PERMANENT(
-//         R.string.settings_uninstall_permanent,
-//         R.string.settings_uninstall_permanent_message,
-//         Icons.Filled.DeleteForever
-//     ),
-//     RESTORE_STOCK_IMAGE(
-//         R.string.settings_restore_stock_image,
-//         R.string.settings_restore_stock_image_message,
-//         Icons.AutoMirrored.Filled.Undo
-//     ),
-//     NONE(0, 0, Icons.Filled.Delete)
-// }
+enum class UninstallType(val title: Int, val message: Int, val icon: ImageVector) {
+    TEMPORARY(
+        R.string.settings_uninstall_temporary,
+        R.string.settings_uninstall_temporary_message,
+        Icons.Filled.Delete
+    ),
+    PERMANENT(
+        R.string.settings_uninstall_permanent,
+        R.string.settings_uninstall_permanent_message,
+        Icons.Filled.DeleteForever
+    ),
+    RESTORE_STOCK_IMAGE(
+        R.string.settings_restore_stock_image,
+        R.string.settings_restore_stock_image_message,
+        Icons.AutoMirrored.Filled.Undo
+    ),
+    NONE(0, 0, Icons.Filled.Delete)
+}
 
-// @OptIn(ExperimentalMaterial3Api::class)
-// @Composable
-// fun rememberUninstallDialog(onSelected: (UninstallType) -> Unit): DialogHandle {
-//     return rememberCustomDialog { dismiss ->
-//         val options = listOf(
-//             // UninstallType.TEMPORARY,
-//             UninstallType.PERMANENT,
-//             UninstallType.RESTORE_STOCK_IMAGE
-//         )
-//         val listOptions = options.map {
-//             ListOption(
-//                 titleText = stringResource(it.title),
-//                 subtitleText = if (it.message != 0) stringResource(it.message) else null,
-//                 icon = IconSource(it.icon)
-//             )
-//         }
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun rememberUninstallDialog(onSelected: (UninstallType) -> Unit): DialogHandle {
+    return rememberCustomDialog { dismiss ->
+        val options = listOf(
+            // UninstallType.TEMPORARY,
+            UninstallType.PERMANENT,
+            UninstallType.RESTORE_STOCK_IMAGE
+        )
+        val listOptions = options.map {
+            ListOption(
+                titleText = stringResource(it.title),
+                subtitleText = if (it.message != 0) stringResource(it.message) else null,
+                icon = IconSource(it.icon)
+            )
+        }
 
-//         var selection = UninstallType.NONE
-//         ListDialog(state = rememberUseCaseState(visible = true, onFinishedRequest = {
-//             if (selection != UninstallType.NONE) {
-//                 onSelected(selection)
-//             }
-//         }, onCloseRequest = {
-//             dismiss()
-//         }), header = Header.Default(
-//             title = stringResource(R.string.settings_uninstall),
-//         ), selection = ListSelection.Single(
-//             showRadioButtons = false,
-//             options = listOptions,
-//         ) { index, _ ->
-//             selection = options[index]
-//         })
-//     }
-// } // DISBAND LKM MODE
+        var selection = UninstallType.NONE
+        ListDialog(state = rememberUseCaseState(visible = true, onFinishedRequest = {
+            if (selection != UninstallType.NONE) {
+                onSelected(selection)
+            }
+        }, onCloseRequest = {
+            dismiss()
+        }), header = Header.Default(
+            title = stringResource(R.string.settings_uninstall),
+        ), selection = ListSelection.Single(
+            showRadioButtons = false,
+            options = listOptions,
+        ) { index, _ ->
+            selection = options[index]
+        })
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -640,7 +622,11 @@ private fun TopBar(
     scrollBehavior: TopAppBarScrollBehavior? = null,
 ) {
     TopAppBar(
-        title = { Text(stringResource(R.string.settings)) },
+        title = { Text(
+            text = stringResource(R.string.settings),
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Black,
+        ) },
         windowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
         scrollBehavior = scrollBehavior
     )

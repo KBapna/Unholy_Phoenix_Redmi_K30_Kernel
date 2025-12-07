@@ -1,4 +1,5 @@
 name: Build LKM for KernelSU-Next
+
 on:
   push:
     branches: [ "next" ]
@@ -15,23 +16,23 @@ jobs:
       matrix:
         include:
           - version: "android12-5.10"
-            sub_level: 233
-            os_patch_level: 2025-02
+            sub_level: 237
+            os_patch_level: 2025-06
           - version: "android13-5.10"
-            sub_level: 234
-            os_patch_level: 2025-03
+            sub_level: 238
+            os_patch_level: 2025-07
           - version: "android13-5.15"
-            sub_level: 178
-            os_patch_level: 2025-03
+            sub_level: 185
+            os_patch_level: 2025-07
           - version: "android14-5.15"
-            sub_level: 178
-            os_patch_level: 2025-03
+            sub_level: 185
+            os_patch_level: 2025-07
           - version: "android14-6.1"
-            sub_level: 129
-            os_patch_level: 2025-04
+            sub_level: 145
+            os_patch_level: 2025-08
           - version: "android15-6.6"
-            sub_level: 82
-            os_patch_level: 2025-04
+            sub_level: 98
+            os_patch_level: 2025-08
     uses: ./.github/workflows/gki-kernel.yml
     with:
       version: ${{ matrix.version }}

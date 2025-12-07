@@ -8,43 +8,22 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.WindowInsetsSides
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.only
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.FileUpload
-import androidx.compose.material3.Button
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.TopAppBarScrollBehavior
-import androidx.compose.material3.rememberTopAppBarState
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.dropUnlessResumed
@@ -62,12 +41,7 @@ import com.rifsxd.ksunext.R
 import com.rifsxd.ksunext.ui.component.DialogHandle
 import com.rifsxd.ksunext.ui.component.rememberConfirmDialog
 import com.rifsxd.ksunext.ui.component.rememberCustomDialog
-import com.rifsxd.ksunext.ui.util.LkmSelection
-import com.rifsxd.ksunext.ui.util.getCurrentKmi
-import com.rifsxd.ksunext.ui.util.getSupportedKmis
-import com.rifsxd.ksunext.ui.util.isAbDevice
-import com.rifsxd.ksunext.ui.util.isInitBoot
-import com.rifsxd.ksunext.ui.util.rootAvailable
+import com.rifsxd.ksunext.ui.util.*
 
 /**
  * @author weishu
@@ -77,6 +51,36 @@ import com.rifsxd.ksunext.ui.util.rootAvailable
 @Destination<RootGraph>
 @Composable
 fun InstallScreen(navigator: DestinationsNavigator) {
+    var showLkmWarning by rememberSaveable { mutableStateOf(true) }
+
+    if (showLkmWarning) {
+        AlertDialog(
+            onDismissRequest = {
+                showLkmWarning = false
+                navigator.popBackStack()
+            },
+            title = { Text(
+                text = stringResource(R.string.warning),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold
+            ) },
+            text = { Text(stringResource(R.string.lkm_warning_message)) },
+            confirmButton = {
+                TextButton(onClick = { showLkmWarning = false }) {
+                    Text(stringResource(R.string.proceed))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    showLkmWarning = false
+                    navigator.popBackStack()
+                }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            }
+        )
+    }
+
     var installMethod by remember {
         mutableStateOf<InstallMethod?>(null)
     }
@@ -182,7 +186,7 @@ fun InstallScreen(navigator: DestinationsNavigator) {
 sealed class InstallMethod {
     data class SelectFile(
         val uri: Uri? = null,
-        @StringRes override val label: Int = R.string.select_file,
+        @param:StringRes override val label: Int = R.string.select_file,
         override val summary: String?
     ) : InstallMethod()
 
@@ -205,7 +209,7 @@ private fun SelectInstallMethod(onSelected: (InstallMethod) -> Unit = {}) {
     val rootAvailable = rootAvailable()
     val isAbDevice = isAbDevice()
     val selectFileTip = stringResource(
-        id = R.string.select_file_tip, if (isInitBoot()) "init_boot" else "boot"
+        id = R.string.select_file_tip, if (isInitBoot()) "init_boot/vendor_boot" else "boot"
     )
     val radioOptions =
         mutableListOf<InstallMethod>(InstallMethod.SelectFile(summary = selectFileTip))
@@ -308,7 +312,7 @@ private fun SelectInstallMethod(onSelected: (InstallMethod) -> Unit = {}) {
 @Composable
 fun rememberSelectKmiDialog(onSelected: (String?) -> Unit): DialogHandle {
     return rememberCustomDialog { dismiss ->
-        val supportedKmi by produceState(initialValue = emptyList<String>()) {
+        val supportedKmi by produceState(initialValue = emptyList()) {
             value = getSupportedKmis()
         }
         val options = supportedKmi.map { value ->
@@ -341,7 +345,11 @@ private fun TopBar(
     scrollBehavior: TopAppBarScrollBehavior? = null
 ) {
     TopAppBar(
-        title = { Text(stringResource(R.string.install)) }, navigationIcon = {
+        title = { Text(
+                text = stringResource(R.string.install),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Black,
+            ) }, navigationIcon = {
             IconButton(
                 onClick = onBack
             ) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null) }
