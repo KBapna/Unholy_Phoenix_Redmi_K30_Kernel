@@ -49,7 +49,7 @@ config KSU_SUSFS
       Patch and Enable SUSFS to kernel with KernelSU.
 
 config KSU_SUSFS_HAS_MAGIC_MOUNT
-    bool "Say yes if the current KernelSU repo has magic mount implemented (default y)"
+    bool "Say yes if the current KernelSU repo has magic mount implemented (default n)"
     depends on KSU
     default y
     help
@@ -169,18 +169,6 @@ config KSU_SUSFS_OPEN_REDIRECT
       - Allow redirecting a target path to be opened with another user-defined path.
       - Effective only on processes with uid < 2000.
       - Please be reminded that process with open access to the target and redirected path can be detected.
-
-config KSU_SUSFS_SUS_SU
-    bool "Enable SUS-SU in runtime temporarily"
-    depends on KSU_SUSFS && KPROBES && HAVE_KPROBES && KPROBE_EVENTS
-    default y
-    help
-      - Allow user to enable or disable core ksu kprobes hooks temporarily in runtime. There are 2 working modes for sus_su.
-      - Mode 0 (default): Disable sus_su, and enable ksu kprobe hooks for su instead.
-      - Mode 1 (deprecated): 
-      - Mode 2: Enable sus_su, and disable ksu kprobe hooks for su, which means the kernel inline hooks are enabled,
-                the same as the su implementaion of non-gki kernel without kprobe supported.
-      - Only apps with root access granted by ksu manager are allowed to get root.
 
 endmenu
 

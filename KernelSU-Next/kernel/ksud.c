@@ -58,15 +58,11 @@ static void stop_input_hook();
 static struct work_struct stop_vfs_read_work;
 static struct work_struct stop_execve_hook_work;
 static struct work_struct stop_input_hook_work;
-#endif
-
+#else
 bool ksu_vfs_read_hook __read_mostly = true;
 bool ksu_execveat_hook __read_mostly = true;
 bool ksu_input_hook __read_mostly = true;
-
-#ifdef CONFIG_KSU_SUSFS_SUS_SU
-bool susfs_is_sus_su_ready = false;
-#endif // #ifdef CONFIG_KSU_SUSFS_SUS_SU
+#endif
 
 u32 ksu_devpts_sid;
 
@@ -200,7 +196,7 @@ int ksu_handle_execveat_ksud(int *fd, struct filename **filename_ptr,
 			const char __user *p = get_user_arg_ptr(*argv, 1);
 			if (p && !IS_ERR(p)) {
 				char first_arg[16];
-				ksu_strncpy_from_user_nofault(
+				ksu_strncpy_from_user_retry(
 					first_arg, p, sizeof(first_arg));
 				pr_info("/system/bin/init first arg: %s\n",
 					first_arg);
@@ -225,7 +221,7 @@ int ksu_handle_execveat_ksud(int *fd, struct filename **filename_ptr,
 			const char __user *p = get_user_arg_ptr(*argv, 1);
 			if (p && !IS_ERR(p)) {
 				char first_arg[16];
-				ksu_strncpy_from_user_nofault(
+				ksu_strncpy_from_user_retry(
 					first_arg, p, sizeof(first_arg));
 				pr_info("/init first arg: %s\n", first_arg);
 				if (!strcmp(first_arg, "--second-stage")) {
@@ -250,7 +246,7 @@ int ksu_handle_execveat_ksud(int *fd, struct filename **filename_ptr,
 					}
 					char env[256];
 					// Reading environment variable strings from user space
-					if (ksu_strncpy_from_user_nofault(
+					if (ksu_strncpy_from_user_retry(
 						    env, p, sizeof(env)) < 0)
 						continue;
 					// Parsing environment variable names and values
@@ -341,7 +337,7 @@ int ksu_handle_vfs_read(struct file **file_ptr, char __user **buf_ptr,
 		return 0;
 	}
 
-	if (!d_is_reg(file->f_path.dentry)) {
+	if (!S_ISREG(file->f_path.dentry->d_inode->i_mode)) {
 		return 0;
 	}
 
@@ -399,10 +395,12 @@ int ksu_handle_vfs_read(struct file **file_ptr, char __user **buf_ptr,
 	if (orig_read) {
 		fops_proxy.read = read_proxy;
 	}
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 16, 0) 
 	orig_read_iter = file->f_op->read_iter;
 	if (orig_read_iter) {
 		fops_proxy.read_iter = read_iter_proxy;
 	}
+#endif
 	// replace the file_operations
 	file->f_op = &fops_proxy;
 	read_count_append = rc_count;
@@ -489,10 +487,12 @@ __maybe_unused int ksu_handle_execve_ksud(const char __user *filename_user,
 	struct filename filename_in, *filename_p;
 	char path[32];
 
+#ifndef CONFIG_KSU_KPROBES_HOOK
 	// return early if disabled.
 	if (!ksu_execveat_hook) {
 		return 0;
 	}
+#endif
 
 	if (!filename_user)
 		return 0;
@@ -635,6 +635,29 @@ static void do_stop_input_hook(struct work_struct *work)
 }
 #endif
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
+#include "objsec.h" // task_security_struct
+bool is_ksu_transition(const struct task_security_struct *old_tsec,
+			const struct task_security_struct *new_tsec)
+{
+	static u32 ksu_sid;
+	char *secdata;
+	u32 seclen;
+	bool allowed = false;
+
+	if (!ksu_sid)
+		security_secctx_to_secid("u:r:su:s0", strlen("u:r:su:s0"), &ksu_sid);
+
+	if (security_secid_to_secctx(old_tsec->sid, &secdata, &seclen))
+		return false;
+
+	allowed = (!strcmp("u:r:init:s0", secdata) && new_tsec->sid == ksu_sid);
+	security_release_secctx(secdata, seclen);
+	
+	return allowed;
+}
+#endif
+
 static void stop_vfs_read_hook()
 {
 #ifdef CONFIG_KSU_KPROBES_HOOK
@@ -654,10 +677,6 @@ static void stop_execve_hook()
 #else
 	ksu_execveat_hook = false;
 	pr_info("stop execve_hook\n");
-#endif
-#ifdef CONFIG_KSU_SUSFS_SUS_SU
-	susfs_is_sus_su_ready = true;
-	pr_info("susfs: sus_su is ready\n");
 #endif
 }
 

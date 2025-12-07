@@ -930,9 +930,9 @@ diff --git a/fs/proc/cmdline.c b/fs/proc/cmdline.c
 index 403cbb12a6e9..7c3fad2cb84c 100644
 --- a/fs/proc/cmdline.c
 +++ b/fs/proc/cmdline.c
-@@ -4,8 +4,18 @@
- #include <linux/proc_fs.h>
- #include <linux/seq_file.h>
+@@ -71,8 +71,18 @@
+ }
+ #endif
  
 +#ifdef CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG
 +extern int susfs_spoof_cmdline_or_bootconfig(struct seq_file *m);
@@ -946,9 +946,9 @@ index 403cbb12a6e9..7c3fad2cb84c 100644
 +		return 0;
 +	}
 +#endif
- 	seq_printf(m, "%s\n", saved_command_line);
- 	return 0;
- }
+ #ifdef ALTER_CMDLINE
+ 	seq_printf(m, "%s\n", proc_command_line);
+ #else
 diff --git a/fs/proc/fd.c b/fs/proc/fd.c
 index 96fc70225e54..f5cc2d5984d7 100644
 --- a/fs/proc/fd.c
@@ -998,10 +998,10 @@ diff --git a/fs/proc/task_mmu.c b/fs/proc/task_mmu.c
 index b8708a383b85..8c1508242988 100644
 --- a/fs/proc/task_mmu.c
 +++ b/fs/proc/task_mmu.c
-@@ -19,6 +19,9 @@
- #include <linux/shmem_fs.h>
+@@ -19,6 +19,9 @@0
  #include <linux/uaccess.h>
  #include <linux/mm_inline.h>
+ #include <linux/ctype.h>
 +#ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
 +#include <linux/susfs_def.h>
 +#endif

@@ -1,5 +1,5 @@
 export Directory="/home/Unholy_Phoenix_Redmi_K30_Kernel/"
-export PATH="${Directory}/toolchains/Clang/bin:${Directory}/toolchains/arm-gnu-toolchain-13.2.Rel1-x86_64-aarch64-none-linux-gnu/bin:${Directory}/toolchains/arm-gnu-toolchain-13.2.Rel1-x86_64-arm-none-linux-gnueabihf/bin:$PATH"
+export PATH="${Directory}/toolchains/Clang/bin:${Directory}/toolchains/arm-gnu-toolchain-14.3.rel1-x86_64-aarch64-none-linux-gnu/bin:${Directory}/toolchains/arm-gnu-toolchain-14.3.rel1-x86_64-arm-none-linux-gnueabihf/bin:$PATH"
 
 export ARCH=arm64
 export KBUILD_BUILD_USER=root
@@ -24,4 +24,3 @@ make -j$(nproc --all) \
     CROSS_COMPILE=aarch64-none-linux-gnu- \
     CROSS_COMPILE_ARM32=arm-none-linux-gnueabihf- \
     CLANG_TRIPLE=aarch64-linux-gnu-
-

@@ -40,26 +40,6 @@ void page_writeback_init(void);
 
 int do_swap_page(struct vm_fault *vmf);
 
-#ifdef CONFIG_SPECULATIVE_PAGE_FAULT
-extern struct vm_area_struct *get_vma(struct mm_struct *mm,
-				      unsigned long addr);
-extern void put_vma(struct vm_area_struct *vma);
-
-static inline bool vma_has_changed(struct vm_fault *vmf)
-{
-	int ret = RB_EMPTY_NODE(&vmf->vma->vm_rb);
-	unsigned int seq = READ_ONCE(vmf->vma->vm_sequence.sequence);
-
-	/*
-	 * Matches both the wmb in write_seqlock_{begin,end}() and
-	 * the wmb in vma_rb_erase().
-	 */
-	smp_rmb();
-
-	return ret || seq != vmf->sequence;
-}
-#endif /* CONFIG_SPECULATIVE_PAGE_FAULT */
-
 void free_pgtables(struct mmu_gather *tlb, struct vm_area_struct *start_vma,
 		unsigned long floor, unsigned long ceiling);
 
@@ -187,6 +167,7 @@ extern void prep_compound_page(struct page *page, unsigned int order);
 extern void post_alloc_hook(struct page *page, unsigned int order,
 					gfp_t gfp_flags);
 extern int user_min_free_kbytes;
+extern atomic_long_t kswapd_waiters;
 
 #if defined CONFIG_COMPACTION || defined CONFIG_CMA
 
@@ -592,13 +573,4 @@ static inline bool is_migrate_highatomic_page(struct page *page)
 }
 
 void setup_zone_pageset(struct zone *zone);
-
-#ifdef CONFIG_ANDROID_LOW_MEMORY_KILLER
-extern bool lmk_kill_possible(void);
-#else
-static inline bool lmk_kill_possible(void)
-{
-	return false;
-}
-#endif
 #endif	/* __MM_INTERNAL_H */
